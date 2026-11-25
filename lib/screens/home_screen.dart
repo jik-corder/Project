@@ -12,47 +12,67 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<TugasKuliah> _daftarTugas = [
-    TugasKuliah(
-      id: '1',
-      mataKuliah: 'DESAIN ANTARMUKA',
-      judulTugas: 'Wireframe & prototipe interaktif',
-      tenggatWaktu: DateTime.now().add(const Duration(hours: 20)),
-      prioritas: PrioritasTugas.tinggi,
-    ),
-    TugasKuliah(
-      id: '2',
-      mataKuliah: 'STRUKTUR DATA',
-      judulTugas: 'Laporan graf & pohon biner',
-      tenggatWaktu: DateTime.now().add(const Duration(days: 3)),
-      prioritas: PrioritasTugas.sedang,
-    ),
-    TugasKuliah(
-      id: '3',
-      mataKuliah: 'BASIS DATA',
-      judulTugas: 'Normalisasi skema ERD',
-      tenggatWaktu: DateTime.now().subtract(const Duration(days: 1)),
-      prioritas: PrioritasTugas.rendah,
-      selesai: true,
-    ),
-  ];
+  // Kosong di awal; terisi setelah pengguna menginput tugas/rutinitas baru
+  final List<TugasKuliah> _daftarTugas = [];
+  final List<RutinitasBulanan> _daftarRutinitas = [];
 
-  final List<RutinitasBulanan> _daftarRutinitas = [
-    RutinitasBulanan(
-      id: 'r1',
-      namaKegiatan: 'Ganti oli motor',
-      tanggalTarget: 31,
-      jamNotif: 7,
-      menitNotif: 0,
-    ),
-    RutinitasBulanan(
-      id: 'r2',
-      namaKegiatan: 'Bayar kos & Wi-Fi',
-      tanggalTarget: 5,
-      jamNotif: 8,
-      menitNotif: 0,
-    ),
-  ];
+  Future<void> _tampilkanPopupKonfirmasi({
+    required String judulPopup,
+    required String isiPesan,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.permukaanKartu,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.garisBatas),
+        ),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: AppTheme.softBlue,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                judulPopup,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.teksUtama,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          isiPesan,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppTheme.teksSekunder,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.softBlue,
+              foregroundColor: const Color(0xFF08121E),
+            ),
+            child: const Text(
+              'Oke',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _bukaHalamanTambah() async {
     final hasil = await Navigator.push<Object?>(
@@ -62,8 +82,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (hasil is TugasKuliah) {
       setState(() => _daftarTugas.insert(0, hasil));
+      await _tampilkanPopupKonfirmasi(
+        judulPopup: 'Tugas kuliah ditambahkan',
+        isiPesan:
+            '${hasil.mataKuliah} — "${hasil.judulTugas}"\nTenggat: ${_formatTanggalPendek(hasil.tenggatWaktu)} WIB',
+      );
     } else if (hasil is RutinitasBulanan) {
       setState(() => _daftarRutinitas.insert(0, hasil));
+      final jam = hasil.jamNotif.toString().padLeft(2, '0');
+      final menit = hasil.menitNotif.toString().padLeft(2, '0');
+      await _tampilkanPopupKonfirmasi(
+        judulPopup: 'Rutinitas bulanan aktif',
+        isiPesan:
+            '"${hasil.namaKegiatan}" dijadwalkan setiap tanggal ${hasil.tanggalTarget} pukul $jam.$menit WIB.',
+      );
     }
   }
 
@@ -78,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (hasil is TugasKuliah) {
       setState(() => _daftarTugas[index] = hasil);
+      await _tampilkanPopupKonfirmasi(
+        judulPopup: 'Tugas diperbarui',
+        isiPesan:
+            '${hasil.mataKuliah} — "${hasil.judulTugas}"\nTenggat baru: ${_formatTanggalPendek(hasil.tenggatWaktu)} WIB',
+      );
     }
   }
 
@@ -118,6 +155,70 @@ class _HomeScreenState extends State<HomeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('"${tugasTarget.judulTugas}" telah dihapus.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editRutinitas(int index) async {
+    final rutinitasLama = _daftarRutinitas[index];
+    final hasil = await Navigator.push<Object?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddScreen(rutinitasToEdit: rutinitasLama),
+      ),
+    );
+
+    if (hasil is RutinitasBulanan) {
+      setState(() => _daftarRutinitas[index] = hasil);
+      final jam = hasil.jamNotif.toString().padLeft(2, '0');
+      final menit = hasil.menitNotif.toString().padLeft(2, '0');
+      await _tampilkanPopupKonfirmasi(
+        judulPopup: 'Rutinitas diperbarui',
+        isiPesan:
+            '"${hasil.namaKegiatan}" diperbarui menjadi setiap tanggal ${hasil.tanggalTarget} pukul $jam.$menit WIB.',
+      );
+    }
+  }
+
+  Future<void> _hapusRutinitas(int index) async {
+    final target = _daftarRutinitas[index];
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.permukaanKartu,
+        title: const Text(
+          'Hapus rutinitas bulanan?',
+          style: TextStyle(color: AppTheme.teksUtama),
+        ),
+        content: Text(
+          'Hapus "${target.namaKegiatan}" dari daftar rutinitas bulanan?',
+          style: const TextStyle(color: AppTheme.teksSekunder),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7B7B),
+              foregroundColor: const Color(0xFF08121E),
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (konfirmasi == true) {
+      setState(() => _daftarRutinitas.removeAt(index));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rutinitas "${target.namaKegiatan}" telah dihapus.'),
           ),
         );
       }
@@ -287,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: const [
                     Text(
-                      'Tidak ada tugas kuliah di daftar',
+                      'Belum ada tugas kuliah',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -296,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Tugas yang sudah selesai atau salah input sudah bersih. Tekan "+ Tambah baru" untuk mencatat tugas baru.',
+                      'Daftar tugas kuliah masih kosong. Tekan "+ Tambah baru" di kanan bawah untuk mencatat tugas.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -465,80 +566,145 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            ..._daftarRutinitas.map((rutinitas) {
-              final tglEfektif = DateHelper.tanggalRutinitasBulanan(
-                tahun: sekarang.year,
-                bulan: sekarang.month,
-                tanggalTarget: rutinitas.tanggalTarget,
-                jam: rutinitas.jamNotif,
-                menit: rutinitas.menitNotif,
-              );
-              final disesuaikan = tglEfektif.day != rutinitas.tanggalTarget;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
+            if (_daftarRutinitas.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: AppTheme.permukaanKartu,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.garisBatas),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.softBlue.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${tglEfektif.day}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.softBlue,
-                        ),
+                child: Column(
+                  children: const [
+                    Text(
+                      'Belum ada rutinitas bulanan',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.teksUtama,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            rutinitas.namaKegiatan,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.teksUtama,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            disesuaikan
-                                ? 'Target tgl ${rutinitas.tanggalTarget} -> tgl ${tglEfektif.day} bulan ini'
-                                : 'Setiap tanggal ${rutinitas.tanggalTarget} · ${rutinitas.jamNotif.toString().padLeft(2, '0')}.${rutinitas.menitNotif.toString().padLeft(2, '0')} WIB',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.teksSekunder,
-                            ),
-                          ),
-                        ],
+                    SizedBox(height: 4),
+                    Text(
+                      'Daftar rutinitas bulanan masih kosong. Tekan "+ Tambah baru" lalu pilih tab Rutinitas bulanan untuk menjadwalkan.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.teksSekunder,
                       ),
-                    ),
-                    Switch.adaptive(
-                      activeTrackColor: AppTheme.softBlue,
-                      value: rutinitas.aktif,
-                      onChanged: (val) {
-                        setState(() => rutinitas.aktif = val);
-                      },
                     ),
                   ],
                 ),
-              );
-            }),
+              )
+            else
+              ..._daftarRutinitas.asMap().entries.map((entry) {
+                final index = entry.key;
+                final rutinitas = entry.value;
+                final tglEfektif = DateHelper.tanggalRutinitasBulanan(
+                  tahun: sekarang.year,
+                  bulan: sekarang.month,
+                  tanggalTarget: rutinitas.tanggalTarget,
+                  jam: rutinitas.jamNotif,
+                  menit: rutinitas.menitNotif,
+                );
+                final disesuaikan = tglEfektif.day != rutinitas.tanggalTarget;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.permukaanKartu,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.garisBatas),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.softBlue.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${tglEfektif.day}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.softBlue,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rutinitas.namaKegiatan,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.teksUtama,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              disesuaikan
+                                  ? 'Target tgl ${rutinitas.tanggalTarget} -> tgl ${tglEfektif.day} bulan ini'
+                                  : 'Setiap tanggal ${rutinitas.tanggalTarget} · ${rutinitas.jamNotif.toString().padLeft(2, '0')}.${rutinitas.menitNotif.toString().padLeft(2, '0')} WIB',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.teksSekunder,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () => _editRutinitas(index),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                      color: AppTheme.teksSekunder,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () => _hapusRutinitas(index),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                      color: Color(0xFFFF7B7B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        activeTrackColor: AppTheme.softBlue,
+                        value: rutinitas.aktif,
+                        onChanged: (val) {
+                          setState(() => rutinitas.aktif = val);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }),
           ],
         ),
       ),
