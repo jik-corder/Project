@@ -4,7 +4,9 @@ import '../utils/app_theme.dart';
 import '../utils/date_helper.dart';
 
 class AddScreen extends StatefulWidget {
-  const AddScreen({super.key});
+  final TugasKuliah? tugasToEdit;
+
+  const AddScreen({super.key, this.tugasToEdit});
 
   @override
   State<AddScreen> createState() => _AddScreenState();
@@ -15,11 +17,11 @@ class _AddScreenState extends State<AddScreen> {
   int _modeForm = 0;
 
   // State form Tugas kuliah
-  final TextEditingController _matkulController = TextEditingController();
-  final TextEditingController _judulTugasController = TextEditingController();
-  DateTime _tanggalTenggat = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _jamTenggat = const TimeOfDay(hour: 23, minute: 59);
-  PrioritasTugas _prioritas = PrioritasTugas.sedang;
+  late final TextEditingController _matkulController;
+  late final TextEditingController _judulTugasController;
+  late DateTime _tanggalTenggat;
+  late TimeOfDay _jamTenggat;
+  late PrioritasTugas _prioritas;
 
   // State form Rutinitas bulanan
   final TextEditingController _namaRutinitasController = TextEditingController();
@@ -31,6 +33,34 @@ class _AddScreenState extends State<AddScreen> {
   TimeOfDay _jamNotif = const TimeOfDay(hour: 7, minute: 0);
 
   String? _pesanError;
+
+  bool get _sedangEditTugas => widget.tugasToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final edit = widget.tugasToEdit;
+    _matkulController = TextEditingController(text: edit?.mataKuliah ?? '');
+    _judulTugasController = TextEditingController(text: edit?.judulTugas ?? '');
+
+    if (edit != null) {
+      _modeForm = 0;
+      _tanggalTenggat = DateTime(
+        edit.tenggatWaktu.year,
+        edit.tenggatWaktu.month,
+        edit.tenggatWaktu.day,
+      );
+      _jamTenggat = TimeOfDay(
+        hour: edit.tenggatWaktu.hour,
+        minute: edit.tenggatWaktu.minute,
+      );
+      _prioritas = edit.prioritas;
+    } else {
+      _tanggalTenggat = DateTime.now().add(const Duration(days: 1));
+      _jamTenggat = const TimeOfDay(hour: 23, minute: 59);
+      _prioritas = PrioritasTugas.sedang;
+    }
+  }
 
   @override
   void dispose() {
@@ -56,10 +86,16 @@ class _AddScreenState extends State<AddScreen> {
 
   Future<void> _pilihTanggalTenggat() async {
     final sekarang = DateTime.now();
+    final hariIni = DateTime(sekarang.year, sekarang.month, sekarang.day);
+    final firstDate = _tanggalTenggat.isBefore(hariIni) ? _tanggalTenggat : hariIni;
+    final initialDate = _tanggalTenggat.isBefore(firstDate)
+        ? firstDate
+        : _tanggalTenggat;
+
     final dipilih = await showDatePicker(
       context: context,
-      initialDate: _tanggalTenggat.isAfter(sekarang) ? _tanggalTenggat : sekarang,
-      firstDate: DateTime(sekarang.year, sekarang.month, sekarang.day),
+      initialDate: initialDate,
+      firstDate: firstDate,
       lastDate: DateTime(sekarang.year + 3),
     );
     if (dipilih != null) {
@@ -115,16 +151,17 @@ class _AddScreenState extends State<AddScreen> {
       return;
     }
 
-    final tugasBaru = TugasKuliah(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    final edit = widget.tugasToEdit;
+    final tugasHasil = TugasKuliah(
+      id: edit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       mataKuliah: _matkulController.text.trim().toUpperCase(),
       judulTugas: _judulTugasController.text.trim(),
       tenggatWaktu: tenggatGabungan,
       prioritas: _prioritas,
-      selesai: false,
+      selesai: edit?.selesai ?? false,
     );
 
-    Navigator.pop(context, tugasBaru);
+    Navigator.pop(context, tugasHasil);
   }
 
   void _simpanRutinitas() {
@@ -168,9 +205,9 @@ class _AddScreenState extends State<AddScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Tambah baru',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        title: Text(
+          _sedangEditTugas && _modeForm == 0 ? 'Edit tugas kuliah' : 'Tambah baru',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
       body: SafeArea(
@@ -213,18 +250,20 @@ class _AddScreenState extends State<AddScreen> {
             const SizedBox(height: 22),
 
             if (_modeForm == 0) ...[
-              const Text(
-                'Tugas kuliah baru',
-                style: TextStyle(
+              Text(
+                _sedangEditTugas ? 'Edit tugas kuliah' : 'Tugas kuliah baru',
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.teksUtama,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Catat tugasnya sekarang, fokus mengerjakannya nanti.',
-                style: TextStyle(fontSize: 13, color: AppTheme.teksSekunder),
+              Text(
+                _sedangEditTugas
+                    ? 'Perbarui detail tugas jika ada salah input atau perubahan.'
+                    : 'Catat tugasnya sekarang, fokus mengerjakannya nanti.',
+                style: const TextStyle(fontSize: 13, color: AppTheme.teksSekunder),
               ),
               const SizedBox(height: 20),
 
@@ -647,7 +686,9 @@ class _AddScreenState extends State<AddScreen> {
                   ),
                 ),
                 child: Text(
-                  _modeForm == 0 ? 'Simpan tugas' : 'Simpan rutinitas',
+                  _modeForm == 0
+                      ? (_sedangEditTugas ? 'Simpan perubahan' : 'Simpan tugas')
+                      : 'Simpan rutinitas',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

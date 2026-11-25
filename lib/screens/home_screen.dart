@@ -67,6 +67,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _editTugas(int index) async {
+    final tugasLama = _daftarTugas[index];
+    final hasil = await Navigator.push<Object?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddScreen(tugasToEdit: tugasLama),
+      ),
+    );
+
+    if (hasil is TugasKuliah) {
+      setState(() => _daftarTugas[index] = hasil);
+    }
+  }
+
+  Future<void> _hapusTugas(int index) async {
+    final tugasTarget = _daftarTugas[index];
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.permukaanKartu,
+        title: const Text(
+          'Hapus tugas?',
+          style: TextStyle(color: AppTheme.teksUtama),
+        ),
+        content: Text(
+          'Hapus "${tugasTarget.judulTugas}" dari daftar tugas kuliah?',
+          style: const TextStyle(color: AppTheme.teksSekunder),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7B7B),
+              foregroundColor: const Color(0xFF08121E),
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (konfirmasi == true) {
+      setState(() => _daftarTugas.removeAt(index));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${tugasTarget.judulTugas}" telah dihapus.'),
+          ),
+        );
+      }
+    }
+  }
+
   String _formatTanggalPendek(DateTime tgl) {
     const bulan = [
       'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -219,16 +276,42 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
             if (_daftarTugas.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Belum ada tugas kuliah. Tekan Tambah baru untuk mencatat.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.teksSekunder),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppTheme.permukaanKartu,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.garisBatas),
+                ),
+                child: Column(
+                  children: const [
+                    Text(
+                      'Tidak ada tugas kuliah di daftar',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.teksUtama,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Tugas yang sudah selesai atau salah input sudah bersih. Tekan "+ Tambah baru" untuk mencatat tugas baru.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.teksSekunder,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
-              ..._daftarTugas.map((tugas) {
+              ..._daftarTugas.asMap().entries.map((entry) {
+                final index = entry.key;
+                final tugas = entry.value;
                 final warnaPrio = _warnaPrioritas(tugas.prioritas);
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
@@ -238,33 +321,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: AppTheme.garisBatas),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      GestureDetector(
-                        onTap: () {
-                          setState(() => tugas.selesai = !tugas.selesai);
-                        },
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: tugas.selesai
-                                ? AppTheme.softBlue
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => tugas.selesai = !tugas.selesai);
+                          },
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
                               color: tugas.selesai
                                   ? AppTheme.softBlue
-                                  : AppTheme.teksSekunder,
-                              width: 1.6,
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: tugas.selesai
+                                    ? AppTheme.softBlue
+                                    : AppTheme.teksSekunder,
+                                width: 1.6,
+                              ),
                             ),
+                            child: tugas.selesai
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: Color(0xFF08121E),
+                                  )
+                                : null,
                           ),
-                          child: tugas.selesai
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  size: 16,
-                                  color: Color(0xFF08121E),
-                                )
-                              : null,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -306,23 +393,60 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: warnaPrio.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _labelPrioritas(tugas.prioritas),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: warnaPrio,
+                      const SizedBox(width: 6),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: warnaPrio.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _labelPrioritas(tugas.prioritas),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: warnaPrio,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => _editTugas(index),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                    color: AppTheme.teksSekunder,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => _hapusTugas(index),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: Color(0xFFFF7B7B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
